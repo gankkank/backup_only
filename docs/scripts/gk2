@@ -1,0 +1,324 @@
+#!/bin/bash
+
+#because some logic will check login status, send no network connection if can't curl
+host="api-gank.rhcloud.com"
+hosturl="http://${host}"
+apiurl="${hosturl}/source/api"
+srcv="/opt/srcv"
+DEBUG=0
+
+scriptHome=~/.gk
+apiCache="${scriptHome}/source-api.cache"
+
+login="${hosturl}/signin"
+cookie="${scriptHome}/cookie.cccccccc"
+settings="${scriptHome}/config"
+####start pre load
+[ -d $scriptHome ] || mkdir $scriptHome
+[ -d $srcv ] || mkdir $srcv
+err="\033[31m"
+info="\033[47;1;30m"
+black="\033[30m"
+blue="\033[34m"
+cyan="\033[36m"
+echo.info() {
+  echo -ne "${info}$1"; tput sgr0; echo -n " "
+}
+echo.err() {
+  echo -ne "${err}$1"; tput sgr0; echo -n " "
+}
+echo.blue() {
+  echo -ne "${blue}$1"; tput sgr0; echo -n " "
+}
+echo.black() {
+  echo -ne "${black}$1"; tput sgr0; echo -n " "
+}
+echo.cyan() {
+  echo -ne "${cyan}$1"; tput sgr0; echo -n " "
+}
+echo.fix() {
+  printf "%-10s" "$1"
+}
+
+sendMsg() {
+case $1 in
+nopass)
+echo.info "GK";echo.err "ERR\t";echo "no username and password"
+exit 1
+;;
+nonetwork|nonet)
+echo.info "GK";echo.err "ERR\t";echo "no network connection"
+exit 1
+;;
+howto)
+echo.info "GK";echo.blue "HOWTO";echo "gk install	#| [service(node,httpd,lighty)] [version]"
+echo.info "GK";echo.blue "HOWTO";echo "gk list	#| [update]"
+echo.info "GK";echo.blue "HOWTO";echo "gk update	#| update source api content in server"
+exit 1
+;;
+setting)
+echo.info "GK";echo.err "ERR\t";echo "wrong setting of gk scripts"
+exit 1
+;;
+network)
+echo.info "GK";echo.err "ERR\t";echo "no network?"
+exit 1
+;;
+noversion)
+echo.info "GK";echo.err "ERR\t";echo "this version is not supported."
+exit 1
+;;
+urlchange)
+echo.info "GK";echo.err "ERR\t";echo "check service website, they may changed something."
+exit 1
+;;
+initCache)
+echo.info "GK";echo.err "INFO\t";echo "init local source cache";exit 1
+;;
+preparePkg)
+echo.info "GK";echo.err "INFO\t";echo "prepare package of this service."
+;;
+updateCache)
+echo.info "GK";echo.err "INFO\t";echo "updating cache info of packages"
+;;
+updateSource)
+echo.info "GK";echo.err "INFO\t";echo "updating source: ${weburl}"
+;;
+uptoDate)
+echo.info "GK";echo.err "INFO\t";echo "all up-to-date"
+;;
+hello)
+echo.info "GK";echo.blue "HELLO";echo "${user}, welcome back!"
+;;
+esac
+}
+
+### main functions
+initSetting() {
+echo -n "init script setting with user/pass? n/Y: "
+read option
+case $option in
+n|N|no|No)
+sendMsg nopass
+;;
+*)
+echo -n "username: "
+read username
+echo "user=$username" >> ${settings}
+echo -n "password: "
+read -s password
+echo "pass=$password" >> ${settings}
+;;
+esac
+}
+loginHost() {
+curl -X POST -c $cookie -d "username=${user}&password=${pass}" $login || sendMsg nonet
+echo ""
+}
+checkLogin() {
+if [ -f $cookie ]
+then
+  status=`curl -b $cookie ${hosturl}/ok 2> /dev/null`
+  [ $? -eq 1 ] && sendMsg nonet
+  [ "x$status" = "xok" ] || loginHost
+else
+  loginHost
+fi
+}
+cacheData() {
+sendMsg updateCache
+curl -b $cookie $apiurl 1> ${apiCache} 2> /dev/null
+}
+sourceLatest() {
+local type=$1
+curl -b $cookie ${apiurl}/${type}/latest 2> /dev/null
+}
+checkSource() {
+local type=$1
+curl -b $cookie ${apiurl}/${type} 2> /dev/null
+}
+preparePkg() {
+sendMsg preparePkg
+local serviceUrl=$1
+local packageName=`basename $serviceUrl`
+cd $srcv
+wget $serviceUrl &> /dev/null
+tar zxf $packageName &> /dev/null
+}
+checkPkg() {
+local serviceUrl=$1
+local packageName=`basename $serviceUrl`
+[ -f ${srcv}/${packageName} ] || preparePkg $serviceUrl
+}
+
+### main logics
+installLogic() {
+which gk-compile &> /dev/null
+[ $? -eq 1 ] && errMsg setting
+if [ ! "x$1" = "x" ] && [ ! "x$2" = "x" ]
+then
+  service=$1 && version=$2
+  url=`grep "${service},${version}" $apiCache | cut -d, -f3`
+  [ "x$url" = "x" ] && sendMsg noversion || checkPkg $url
+  #echo $url
+  gk-compile install $service $version
+elif [ ! "x$1" = "x" ] && [ "x$2" = "x" ]
+then
+  checkLogin
+  service=$1
+  data=`sourceLatest $service` && version=`echo $data | cut -d, -f1` && url=`echo $data | cut -d, -f2` || sendMsg network
+  #echo "$service $version $url"
+  checkPkg $url
+  gk-compile install $service $version
+fi
+}
+
+listLogic() {
+#init cache; run the first time
+[ ! -f $apiCache ] && checkLogin && cacheData  && sendMsg initCache
+#check date
+TODAY=`date "+%Y%m%d"`
+let YESTODAY=$TODAY-1
+timestamp=`ls -l --time-style="+%Y%m%d" $apiCache | cut -d " " -f6`
+[ $timestamp -le $YESTODAY ] && checkLogin && cacheData
+#
+if [ "x$1" = "x" ]
+then
+	cat $apiCache |  awk -F, '{ print $1"\t"$2}' | sort -u
+else
+	case $1 in
+	update)
+	checkLogin
+	cacheData
+	;;
+	*)
+	grep $1 $apiCache |  awk -F, '{ print $1"\t"$2}' | sort -u
+	;;
+	esac
+fi
+}
+
+#### update api server
+postUpdate() {
+sendMsg update
+posturl="${hosturl}/source/new"
+curl -X POST -b $cookie -d "service=$1&version=$2&url=$3" $posturl;echo ""
+}
+updateNode() {
+nodeWeb="http://nodejs.org/dist/latest/"
+pkgname=`curl $nodeWeb 2> /dev/null | sed 's:<a .*>\(.*\)</a>:\1:' | grep "tar.gz" | awk '{ print $1 }' | grep -v ".*-.*-"`
+[ "x$pkgname" = "x" ] && sendMsg urlchange
+webversion=`echo $pkgname | sed 's:node-v\(.*\).tar.gz:\1:'`
+weburl="http://nodejs.org/dist/v${webversion}/${pkgname}"
+
+  checkSource node | grep "$webversion" &> /dev/null
+  if [ $? -eq 1 ]
+  then
+    sendMsg updateSource
+    postUpdate "node" "$webversion" "$weburl"
+  fi
+}
+updateNgx() {
+ngxWeb="http://nginx.org/"
+pkgname=`curl $ngxWeb 2> /dev/null | grep "nginx-" | sed -n 1p | sed "s:.*<a .*>\(.*\)</a>:\1:"`
+[ "x$pkgname" = "x" ] && sendMsg urlchange
+webversion=`echo $pkgname | cut -d - -f 2`
+weburl="http://nginx.org/download/${pkgname}.tar.gz"
+
+  checkSource nginx | grep "$webversion" &> /dev/null
+  if [ $? -eq 1 ]
+  then
+    sendMsg updateSource
+    postUpdate "nginx" "$webversion" "$weburl"
+  fi
+}
+updateHttpd() {
+httpdWeb="http://httpd.apache.org/download.cgi"
+pkgname=`curl $httpdWeb 2> /dev/null | grep "httpd/httpd-.*.tar.gz\"" | sed "s:.*<a .*\"\(.*\)\">.*:\1:"`
+[ "x$pkgname" = "x" ] && sendMsg urlchange
+for pkg in $pkgname
+do
+  weburl=$pkg
+  webversion=`basename $pkg | cut -d - -f 2 | sed "s/.tar.gz//g"`
+  checkSource httpd | grep "$webversion" &> /dev/null
+  if [ $? -eq 1 ]
+  then
+    sendMsg updateSource
+    postUpdate "httpd" "$webversion" "$weburl"
+  fi
+done
+}
+updateLighty() {
+#sample pattern as httpd
+lightyWeb="http://www.lighttpd.net/download/"
+pkgname=`curl $lightyWeb 2> /dev/null | grep "lighttpd.*.tar.gz\"" | sed "s:.*<a .*\"\(.*\)\">.*:\1:"`
+[ "x$pkgname" = "x" ] && sendMsg urlchange
+for pkg in $pkgname
+do
+  weburl=$pkg
+  webversion=`basename $pkg | cut -d - -f 2 | sed "s/.tar.gz//g"`
+  checkSource lighttpd | grep "$webversion" &> /dev/null
+  if [ $? -eq 1 ]
+  then
+    sendMsg updateSource
+    postUpdate "lighttpd" "$webversion" "$weburl"
+  fi
+done
+}
+updatePhp() {
+phpWeb="http://php.net/downloads.php"
+pkgname=`curl $phpWeb 2> /dev/null | grep "php-.*.tar.gz" | sed "s:.*<a .*\"\(.*\)\">.*:\1:" | sed "s:.*get/\(.*\)/from.*:\1:"`
+for pkg in $pkgname
+do
+  weburl="http://hk2.php.net/distributions/${pkg}"
+  webversion=`echo $pkg | cut -d - -f 2 | sed "s/.tar.gz//g"`
+  checkSource php | grep "$webversion" &> /dev/null
+  if [ $? -eq 1 ]
+  then
+    sendMsg updateSource
+    postUpdate "php" "$webversion" "$weburl"
+  fi
+done
+}
+
+updateLogic() {
+checkLogin
+#: notice that node and nginx use [latest] function, this should be changed to methods used in httpd etc.
+#- app service
+updateNode
+updatePhp
+#- web servers
+updateNgx
+updateHttpd
+updateLighty
+#
+sendMsg uptoDate
+}
+####
+checkNetwork() {
+curl -b $cookie ${hosturl}/ok &> /dev/null
+[ $? -eq 1 ] && sendMsg nonetwork
+}
+###main commands
+[ -f $settings ] || initSetting
+#checkNetwork
+user=`cat $settings | grep user | cut -d = -f 2`
+pass=`cat $settings | grep pass | cut -d = -f 2`
+case $1 in
+install|-i)
+installLogic $2 $3
+;;
+reinstall|-ri)
+gk-compile reinstall $2 $3
+;;
+list|-l)
+#list :type; list update; 
+listLogic $2
+;;
+update)
+updateLogic
+;;
+*)
+sendMsg howto
+;;
+esac

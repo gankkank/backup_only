@@ -1,0 +1,7 @@
+#system default method apt-get
+[httpd]
+pkgs="apache2"
+[mongodb]
+pkgs="mongodb-10gen"
+[mysql]
+pkgs="mysql-server"

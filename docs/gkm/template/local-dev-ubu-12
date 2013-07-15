@@ -1,0 +1,28 @@
+#default method compile
+#name=local-dev-ubu-12
+#os=ubuntu-12.04
+
+#default variable
+#link=/opt/${servicename}
+[nginx]
+pkgs="libpcre3-dev libssl-dev libbz2-dev zlib1g-dev libcurl4-openssl-dev"
+usergrp="www-data"
+option="--user=${usergrp} --groups=${usergrp} --with-http_ssl_module --with-http_stub_status_module"
+
+[httpd]
+pkgs="libpcre3-dev"
+options="--with-mpm=prefork --enable-so --enable-ssl"
+
+[lighttpd]
+pkgs="libcurl4-openssl-dev"
+options="--with-openssl-libs=/usr/lib"
+
+[php]
+pkgs="libbz2-dev zlib1g-dev libpcre3-dev libssl-dev curl libmysqlclient-dev libmcrypt-dev curl libcurl4-openssl-dev unzip zip imagemagick bison flex libxml2-dev libssl-dev libpng12-dev libmcrypt-dev libpng3 libncurses5-dev"
+options="--enable-fpm --with-gd --with-zlib --with-curl --with-iconv --with-openssl --with-mysql --with-pdo-mysql"
+
+[nodejs]
+pkgs="libssl-dev apache2-utils"
+options=""
+
+[redis]

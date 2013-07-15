@@ -1,0 +1,35 @@
+server {
+  listen 80;
+  root /opt/site;
+  index index.html index.php;
+  access_log /opt/site/log/main.log;
+  location ~ ^/nagios/cgi-bin {
+    root /opt/nagios/sbin;
+    auth_basic "Nagios Moni";
+    auth_basic_user_file /opt/nagios/htpasswd.users;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    rewrite ^/nagios/cgi-bin/(.*).cgi /$1.cgi break;
+    fastcgi_param AUTH_USER $remote_user;
+    fastcgi_param REMOTE_USER $remote_user;
+    fastcgi_index index.cgi;
+    include conf/fastcgi_params;
+    fastcgi_pass unix:/var/run/fcgiwrap.socket;
+  }
+  location ~ ^(/pnp4nagios.*\.php)(.*)$ {
+    fastcgi_index index.php;
+    fastcgi_split_path_info ^(.+\.php)(.*)$;
+    fastcgi_param PATH_INFO $fastcgi_path_info;
+    fastcgi_param SCRIPT_FILENAME /opt/site/pnp4nagios/index.php;
+    fastcgi_pass fpm-backends;
+    include conf/fastcgi_params;
+  }
+  location ~ ^/(.+\.php|status)$ {
+    fastcgi_index index.php;
+    fastcgi_pass fpm-backends;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    include conf/fastcgi_params;
+  }
+}
+upstream fpm-backends {
+  server 127.0.0.1:9000;
+}

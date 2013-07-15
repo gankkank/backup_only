@@ -1,0 +1,32 @@
+[global]
+error_log = /var/log/php-fpm_error.log
+log_level = error
+emergency_restart_threshold = 10
+emergency_restart_interval = 1m
+process_control_timeout = 10s
+daemonize = yes
+[nginx-fpm]
+listen = 127.0.0.1:9000
+;listen.allowed_clients = 127.0.0.1
+user = www-data
+group = www-data
+request_terminate_timeout = 120s
+request_slowlog_timeout = 5s
+slowlog = /var/log/php-fpm_nginx-fpm_slowlog.log
+pm = dynamic
+pm.max_children = 15
+;pm.start_servers = min_spare_servers + (max_spare_servers - min_spare_servers) / 2
+pm.min_spare_servers = 3
+pm.max_spare_servers = 7
+pm.max_requests = 1000
+pm.status_path = /status
+rlimit_files = 131072
+rlimit_core = 0
+catch_workers_output = yes
+;listen.backlog = -1
+env[HOSTNAME] = $HOSTNAME
+env[PATH] = /usr/local/bin:/usr/bin:/bin:/opt/php/bin
+env[TMP] = /tmp
+env[TMPDIR] = /tmp
+env[TEMP] = /tmp
+

@@ -1,0 +1,142 @@
+#!/bin/bash
+#how to use#
+#./thiscript
+#./thiscript -f hostfilename
+###################
+HOSTfile=/opt/nagios/etc/objects/hosts.cfg
+SERVfile=/opt/nagios/etc/objects/services.cfg
+Groupfile=/opt/nagios/etc/objects/group.cfg
+hosts="hosts.txt"
+counter=1
+####################
+hostdef() {
+echo "" > $HOSTfile
+for list in `cat $hostinfo | grep -v ^#`
+do
+hostname=`echo $list | cut -d, -f2`
+aliasname=`echo $list | cut -d, -f3`
+ipaddress=`echo $list | cut -d, -f4`
+cat >> $HOSTfile << TEMPLATE1
+define host{
+	use	linux-server,host-pnp
+	host_name $hostname
+	alias	$aliasname
+	address	$ipaddress
+}
+TEMPLATE1
+	echo "##HOST##Finish: $hostname;"
+	done
+	echo -e "#check: $HOSTfile \n"
+
+}
+
+servicedef() {
+echo "" > $SERVfile
+for list in `cat $hostinfo | grep -v ^#`
+do
+hostname=`echo $list | cut -d, -f2`
+allcheck=`echo $list,memory,swap,cpu,totalprocs,zombieprocs,disk`
+#if only want service to check,change $allcheck to $list
+services=`echo $allcheck | cut -d, -f5- | sed 's/,/ /g'`
+	for service in $services
+	do	
+case $service in
+#service nagios check
+ssh) 
+description=$service; commands=check_ssh;;
+mysql) 
+description=$service; commands=check_tcp!3306;;
+web)
+description=$service; commands=check_http;;
+ftp)
+description=$service; commands=check_ftp;;
+smtp)
+description=$service; commands=check_smtp;;
+pop3)
+description=$service; commands=check_pop;;
+imap)
+description=$service; commands=check_imap;;
+svn)
+description=$service; commands=check_tcp!3690;;
+#status nagios check
+disk)
+description=$service; commands=check_nrpe!check_disk;;
+memory)
+description=$service; commands=check_nrpe!check_mem;;
+#- raid)
+#- description=$service; commands=check_nrpe!check_raid;;
+cpu)
+description=$service; commands=check_nrpe!check_load;;
+swap)
+description=$service; commands=check_nrpe!check_swap_in;;
+totalprocs)
+description=$service; commands=check_nrpe!check_total_procs;;
+zombieprocs)
+description=$service; commands=check_nrpe!check_zombie_procs;;
+#self define check
+nodejs)
+description=$service; commands=check_http_self!8100;;
+web8080)
+description=$service; commands=check_http_self!8080;;
+smtp587)
+description=$service; commands=check_tcp!587;;
+raid_mega)
+description=$service; commands=check_nrpe!check_raid;;
+raid_mpt)
+description=$service; commands=check_nrpe!check_mpt;;
+raid_mpt2)
+description=$service; commands=check_nrpe!check_mpt2;;
+raid_hp)
+description=$service; commands=check_nrpe!check_hparray;;
+#*)
+#echo "wrong service in $hostinfo";;
+esac
+cat >> $SERVfile << TEMPLATE2
+define service{
+	use	generic-service,srv-pnp
+	host_name	$hostname
+	service_description	$description
+	check_command	$commands
+}
+TEMPLATE2
+	done
+	echo "##SERVICE##Finish: $hostname;"
+	done
+	echo -e "#check: $SERVfile \n"
+}
+
+groupdef() {
+echo "" > $Groupfile
+groups=`cat $hostinfo | grep ^# | cut -d# -f2`
+for group in $groups
+do
+        groupname=`echo $group | cut -d, -f1`
+        groupalias=`echo $group | cut -d, -f2`
+        members=`cat $hostinfo | grep -v ^# | grep ^"$counter" | cut -d, -f2 | tr '\n' ',' | head -c -1`
+#	echo $members
+        echo "
+define hostgroup{
+hostgroup_name $groupname
+alias $groupalias
+members $members
+}" >> $Groupfile
+        let counter=$counter+1
+        echo "##GROUP##Finish: $groupname;"
+done
+        echo -e "#check: $Groupfile \n"
+}
+
+[ $# -eq 0 ] && hostinfo=$hosts
+while getopts f: optn
+do
+	case $optn in
+	f)
+	hostinfo=$OPTARG;;
+	esac
+done
+	[ -f $hostinfo ] && echo -e "\n\t\tNagios Procs using: $hostinfo \n" || echo -e "wrong file;\n  Usage: ./nagios-procs-1.06.sh -f <nagios_host_list>"
+	[ -f $hostinfo ] || exit 1
+	hostdef
+	servicedef
+	groupdef
+

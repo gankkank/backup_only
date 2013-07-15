@@ -1,0 +1,51 @@
+```jade
+doctype 5
+html
+  head
+  body
+    div(id="urls")
+    script(type="text/template", id="urls-template")
+      p <%= data %>
+    script(src="/javascripts/production.build.js")
+    script(src="/urls.json")
+
+    :coffeescript
+      console.log _.keys(urls)
+      app = {}
+      app.View = Backbone.View.extend
+        tagName: 'div'
+        template: _.template $('#urls-template').html()
+        render: (e) ->
+          @.$el.html @template(data: e)
+          @
+      app.Router = Backbone.Router.extend
+        routes:
+          "":"getServices"
+          ":service":"getVersions"
+          ":service/:version":"getUri"
+      app.route = new app.Router()
+      app.route.on "route:getServices", () ->
+        #console.log "q"
+        view = new app.View() 
+        $('#urls').append(view.render(_.keys(urls)).el)
+      app.route.on "route:getVersions", (service) ->
+        #console.log urls["#{service}"]
+        view = new app.View()   
+        $('#urls').append(view.render(_.keys(urls[service])).el)
+      app.route.on "route:getUri", (service, version) ->
+        #console.log version
+        view = new app.View()
+        $('#urls').append(view.render(urls[service][version]).el)
+      Backbone.history.start()
+```
+
+```json
+urls = {
+    node: {
+      "0.10.0": "http://nodejs.org/dist/v0.10.0/node-v0.10.0.tar.gz",
+      "0.9.12": "http://nodejs.org/dist/v0.9.12/node-v0.9.12.tar.gz"
+    }
+  };
+```
+
+* better use nodejs in github

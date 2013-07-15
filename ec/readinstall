@@ -1,0 +1,12 @@
+#vi /etc/gemrc
+install: --no-rdoc --no-ri 
+update:  --no-rdoc --no-ri
+#yum install sqlite-devel
+#gem install sqlite3 -v '1.3.6'
+
+#rails generate scaffold Product title:string description:text image_url:string price:decimal
+#vi db/migrate/20121029084231_create_products.rb
+t.decimal :price, precision: 8, scale: 2
+#rake db:migrate
+
+#

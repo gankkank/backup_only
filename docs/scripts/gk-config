@@ -1,0 +1,175 @@
+#!/bin/bash
+dstPath=/opt
+siteroot=/opt/site
+configs=/opt/sample-configs
+binroot=/opt/bin
+#gk-config status
+#gk-config status services
+cecho() {
+echo -en '\E[47;31m'"\033[1m $1 \033[0m \n"; tput sgr0
+}
+crun() {
+local command=$1
+cecho "$command"
+$command
+}
+pecho() {
+printf "%-15s   %-35s %-30s\n" "$1" "$2" "$3"
+}
+errMsg() {
+case $1 in
+notInstall)
+cecho "* [err] not installed"
+;;
+nodst)
+cecho "* [err] can't fine it in ${dstPath}"
+;;
+enabled)
+cecho "* [err] already enabled."
+;;
+noexsit)
+cecho "* [err] doesn't exsit."
+;;
+esac
+
+}
+
+#
+searchOne() {
+local type=$1
+[ -L ${dstPath}/${type} ] || errMsg notInstall
+local active=`ls -l ${dstPath}/${type} | awk '{print $NF}' | sed "s:/opt/::g"`
+local folder=`basename $active | awk -F "-" '{print $1}'`
+local installed=`ls -d ${dstPath}/${folder}-* 2> /dev/null | grep -v ${active} | awk -F "-" '{print $NF}'`
+local installedstr=`echo $installed`
+pecho "$type" "$active" "$installedstr"
+}
+searchAll() {
+pecho "services" "actived version" "installed version(s)"
+pecho "--------" "---------------" "-------------------"
+types=`ls -l /opt/ | grep "^l" | awk '{print $(NF-2)}'`
+for ty in $types
+do
+	searchOne $ty
+done | sort -t/ -k 2
+}
+
+#swith each cases
+statSearch() {
+case $service in
+pnp|pnp4nagios)
+local serv="pnp4nagios"
+searchOne $serv
+;;
+"")
+searchAll
+;;
+*)
+searchOne $service
+esac
+}
+
+
+pnpEnable() {
+local type=$1
+[ -L ${siteroot}/${type} ] && errMsg enabled
+local nagconf=/opt/nagios/etc
+local pnptp=${configs}/templates-pnp.cfg
+local pnpcfg=${configs}/nagios.cfg
+local pnpcmd=${configs}/commands-pnp.cfg
+local pnpweb=${configs}/pnp4nagios-sample-ngx.conf
+cp $pnptp ${nagconf}/objects/
+cp $pnpcmd ${nagconf}/objects/
+cp $pnpweb /opt/nginx/conf.d/
+cp $pnpcfg ${nagconf}
+ln -s ${dstPath}/${type}/share ${siteroot}/${type}
+cecho "* [todo] include ${pnpweb} in /opt/nginx/nginx.conf"
+cecho "* [todo] echo configs to /opt/nagios/nagios.conf"
+}
+
+ableType() {
+case ${service} in
+pnp|pnp4naigos)
+#local serv="pnp4nagios"
+#[ ! -d ${dstPath}/${pnp} ] && errMsg nodst
+#[ $1 -eq 1 ] && cleanConfig ${pnp} && pnpEnable
+#[ $1 -eq 0 ] && pnpEnable
+ln -s /opt/pnp4nagios/share /opt/site/pnp4nagios
+ln -s /opt/nagios/share /opt/site/nagios
+cp ${configs}/templates-pnp.cfg.sample /opt/nagios/etc/objects/templates-pnp.cfg
+cp ${configs}/commands-pnp.cfg.sample /opt/nagios/etc/objects/commands-pnp.cfg
+cp ${configs}/commands.cfg.sample /opt/nagios/etc/objects/commands.cfg
+cp ${configs}/naigos.cfg.sample /opt/nagios/etc/naigos.cfg
+#
+cp ${configs}/nginx-local.conf.sample /opt/nginx/conf.d/nginx-local.conf
+;;
+nrpd)
+cp ${configs}/nrpe.cfg.sample /opt/nrpd/etc/nrpe.cfg
+[ -d /opt/nagios/libexec ] && cp /opt/nagios/libexec/* /opt/nrpd/libexec/
+;;
+ngx|nginx)
+cp ${configs}/nginx-init.sample /etc/init/nginx.conf
+cp ${configs}/nginx.conf.sample /opt/nginx/nginx.conf
+[ -d /opt/nginx/conf.d ] || mkdir /opt/nginx/conf.d
+cp ${configs}/nginx-local.conf.sample /opt/nginx/conf.d/nginx-local.conf
+;;
+cgi)
+cp ${configs}/cgi-init.sample /etc/init.d/cgi
+;;
+php-fpm)
+cp ${configs}/php-fpm.conf.sample /opt/php/etc/php-fpm.conf
+;;
+esac
+}
+
+#link bin files
+binLink() {
+[ ! -d ${dstPath}/${srv} ] && cecho "* [err] no ${dstPath}/${srv}" && return
+for name in `ls ${dstPath}/${srv}`
+do
+  [ -L ${binroot}/${name} ] && rm ${binroot}/${name}
+  ln -s ${dstPath}/${srv}/${name} ${binroot}/${name}
+done
+}
+binCheck() {
+services="php/bin nginx/sbin nagios/bin node/bin httpd/bin"
+for srv in $services
+do
+  binLink
+done
+}
+
+vimConfig() {
+cecho "pre install"
+apt-get install -y vim git openssh-server wget &> /dev/null
+#cecho "mkdir -p ~/.vim/{bundile,autoload}"
+cecho "configure vim"
+mkdir -p ~/.vim/bundle
+mkdir -p ~/.vim/autoload
+wget http://github.com/tpope/vim-pathogen/raw/master/autoload/pathogen.vim -O ~/.vim/autoload/pathogen.vim
+echo "
+call pathogen#infect()
+call pathogen#helptags()
+" > ~/.vimrc
+
+cd ~/.vim/bundle
+git clone git://github.com/kchmck/vim-coffee-script.git
+git clone git://github.com/tpope/vim-markdown.git
+git clone git://github.com/vim-ruby/vim-ruby.git
+git clone git://github.com/pangloss/vim-javascript.git
+}
+
+service=$2
+case $1 in
+stat|status)
+statSearch
+;;
+enable|on)
+ableType 0
+;;
+bin)
+binCheck
+;;
+vim)
+vimConfig
+esac

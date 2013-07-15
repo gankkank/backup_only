@@ -1,0 +1,115 @@
+#!/bin/bash
+api="https://urls-gank.rhcloud.com/urls/search"
+srcv="/opt/srcv"
+DEBUG=0
+
+err="\E[31m"
+info="\E[47;1;30m"
+black="\E[30m"
+blue="\E[34m"
+cyan="\E[36m"
+echo.info() { 
+  echo -ne "${info}$1"; tput sgr0; echo -n " "
+}
+echo.err() { 
+  echo -ne "${err}$1"; tput sgr0; echo -n " "
+}
+echo.blue() {
+  echo -ne "${blue}$1"; tput sgr0; echo -n " "
+}
+echo.black() {
+  echo -ne "${black}$1"; tput sgr0; echo -n " "
+}
+echo.cyan() {
+  echo -ne "${cyan}$1"; tput sgr0; echo -n " "
+}
+echo.fix() {
+  printf "%-10s" "$1"
+}
+
+errMsg() {
+case $1 in
+howto)
+echo.info "GK";echo.blue "HOWTO";echo "gk list/-l service version"
+echo.info "GK";echo.blue "HOWTO";echo "gk use/-u service version"
+exit 1
+;;
+exist)
+echo.info "GK";echo.err "INFO\t";echo "${filename} file exists"
+;;
+gk-compile)
+echo.info "GK";echo.err "ERR\t";echo "please check if gk-compile script exists"
+exit 1
+;;
+run)
+echo.info "GK";echo.blue "RUN\t";echo.cyan "$2"
+;;
+esac
+}
+list() {
+query=$1
+data=`curl ${api}/${query} 2> /dev/null`
+echo $data
+}
+listLogic() {
+if [ ! "x$1" = "x" ]
+then
+  service=$1
+else
+  list
+  exit 0
+fi
+if [ ! "x$2" = "x" ]
+then
+  version=$2 
+  list ${service}/${version}
+else
+  list $service
+fi
+}
+useLogic() {
+if [ ! "x$1" = "x" ] && [ ! "x$2" = "x" ]
+then
+  service=$1 && version=$2
+  url=`list ${service}/${version}`
+  uri=`echo $url | sed -n 's/.*"\(.*\)".*/\1/p'`
+  filename=`basename $uri`
+  cd $srcv
+  #download
+  [ -f $filename ] && errMsg exist || wget $uri
+  #[ -f $filename ] || wget $uri
+  #tar zxvf
+  steps[0]="tar zxvf ${filename}" 
+  errMsg run "${steps[0]}"; echo -n "? y/N "
+  read option
+  case $option in
+  y|Y)
+    [ $DEBUG -eq 1 ] && ${steps[0]} || ${steps[0]} 1> /dev/null
+  ;;
+  esac
+else
+  errMsg howto
+fi
+}
+installLogic() {
+which gk-compile &> /dev/null
+[ $? -eq 1 ] && errMsg gk-compile
+if [ ! "x$1" = "x" ] && [ ! "x$2" = "x" ]
+then
+  service=$1 && version=$2
+  gk-compile install $service $version
+fi
+}
+
+[ ! "x$1" = "x" ] && command=$1 || errMsg howto
+case $command in
+list|-l)
+listLogic $2 $3
+;;
+use|-u)
+useLogic $2 $3
+;;
+install|-i)
+installLogic $2 $3
+;;
+esac

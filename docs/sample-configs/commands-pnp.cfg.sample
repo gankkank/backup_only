@@ -1,0 +1,20 @@
+define command{
+        command_name    check_http_self
+        command_line    $USER1$/check_http -H '$HOSTADDRESS$' -p '$ARG1$'
+}
+define command{
+        command_name    check_nrpe
+command_line    $USER1$/check_nrpe -H $HOSTADDRESS$ -c $ARG1$
+}
+define command{
+	command_name check_testing_pref
+	command_line /opt/node/bin/coffee /opt/1.coffee
+}
+define command{
+	command_name process-service-perfdata
+	command_line /opt/pnp4/libexec/process_perfdata.pl
+}
+define command{
+	command_name process-host-perfdata
+	command_line /opt/pnp4/libexec/process_perfdata.pl -d HOSTPERFDATA
+}
