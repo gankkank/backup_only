@@ -1,0 +1,11 @@
+extends ../layout
+
+block content
+  div
+    br
+
+  form(method="POST", action="/signup", autocomplete="off")
+    input(name="username", required)
+    input(name="email", required)
+    input(type="password", name="password", required)
+    button(type="submit") Save

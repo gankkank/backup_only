@@ -1,0 +1,11 @@
+extends ../layout
+
+block content
+  div
+    br
+
+  form(method="POST", action="/urls/new", autocomplete="off")
+    input(name="service", required)
+    input(name="version", required)
+    input(name="url", required)
+    button(type="submit") Save

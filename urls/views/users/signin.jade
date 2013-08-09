@@ -1,0 +1,10 @@
+extends ../layout
+
+block content
+  div
+    br
+
+  form(method="POST", action="/signin", autocomplete="off")
+    input(name="username", required)
+    input(name="password", required)
+    button(type="submit") Save

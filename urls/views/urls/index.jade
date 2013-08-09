@@ -1,0 +1,20 @@
+extends ../layout
+
+block content
+  div
+    br
+  div
+    table
+      tr
+        th service
+        th version
+        th url
+        th
+      for item in data
+        tr
+          td #{item.service}
+          td #{item.version}
+          td #{item.url}
+          td
+            a(href="urls/#{item._id}/edit") edit
+    

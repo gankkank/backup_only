@@ -1,0 +1,97 @@
+#db = require("../config/database").conn2
+User = require("../models/user").User(db)
+
+###
+accounts = [
+  { username: "gankgu001", password: "6116abc" },
+  { username: "gankgu002", password: "6116abc" }
+]
+
+login = (req, res) ->
+  console.log req.sessionID
+  if req.body.username is accounts[1].username and req.body.password is accounts[1].password
+    req.session.username = req.body.username
+    res.send "ok"
+  else
+    res.send "failed"
+
+logout = (req, res) ->
+  if req.session.username
+    req.session.destroy()
+    res.send "deleted: #{req.session.username}"
+  else
+    res.send "login first"
+
+login = (req, res) ->
+  User.find { username: req.body.username, passhash: req.body.password } , (err, user) ->
+    console.log req.session
+    console.log req.sessionID
+    console.log user
+    res.send err if err
+    if user.length is 0
+      res.send "wrong username/password"
+    else
+      collection = db.model("mysessions")
+      session = new collection( sid: req.cookies["connect.sid"], lastAccess: new Date(), expires: new Date() + "6000", data: { username: req.body.username})
+      console.log session
+      session.save (err) ->
+        res.send err if err
+        res.send "hello #{session.data.username}"
+
+logout = (req, res) ->
+  collection = db.model("mysessions")
+  #collection.find { sid: req.cookies["connect.sid"] }
+  collection.remove { sid: req.cookies["connect.sid"] }, (err, session) ->
+    res.send err if err
+    console.log session
+    res.send "bye"
+all = (req, res)  ->
+  collection = db.model("mysessions")
+  collection.find {}, (err, sessions) ->
+    res.send err if err
+    res.send sessions
+###
+express = require "express"
+db = require("../config/database").conn2
+#MongooseStore = require "../config/session"
+MongooseStore = require("../config/express-mongodb")(express)
+options =
+  connection: db,
+  collection: "mysessions"
+  clear_interval: 3600
+sessionStore = new MongooseStore(options)
+
+
+all = (req, res) ->
+  console.log req.cookies
+  console.log req.session
+  console.log req.cookies["connect.sid"]
+  sessionStore.all (err, sessions) ->
+    res.send err if err
+    res.send sessions
+
+signin = (req, res) ->
+  console.log req.cookies
+  console.log req.cookies["connect.sid"]
+  User.find { username: req.body.username, passhash: req.body.password } , (err, user) ->
+    res.send err if err
+    if user.length is 0
+      res.send "wrong username/password"
+    else
+      sessionStore.set req.cookies["connect.sid"], { username: req.body.username }, (err, result) ->
+        console.log result
+        res.send err if err
+        res.send "hello #{req.body.username}"
+
+signout = (req, res) ->
+  console.log req.cookies
+  console.log req.cookies["connect.sid"]
+  sessionStore.destroy req.cookies["connect.sid"], (err, result) ->
+    res.send err if err
+    console.log result
+    res.send "ok"
+
+
+exports.new = signin
+exports.destroy = signout
+exports.all = all
