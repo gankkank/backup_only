@@ -1,0 +1,19 @@
+#[[haproxy.conf]]
+
+# HAProxy 
+
+description     "HAProxy"
+
+start on runlevel [2345]
+stop on runlevel [016]
+
+respawn
+respawn limit 2 5
+
+env CONF=/opt/haproxy/mysqld.cfg
+
+pre-start script
+    [ -r $CONF ]
+end script
+
+exec /opt/haproxy/sbin/haproxy -db -f $CONF

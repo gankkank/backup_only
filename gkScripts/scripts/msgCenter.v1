@@ -1,0 +1,93 @@
+#!/bin/bash - 
+#===============================================================================
+#
+#          FILE: msgCenter
+# 
+#         USAGE: source msgCenter; c_mL=6; c_Label=GKM
+# 
+#   DESCRIPTION: 
+# 
+#       OPTIONS: ---
+#  REQUIREMENTS: ---
+#          BUGS: ---
+#         NOTES: ---
+#        AUTHOR: gankkank (), gankkank@gmail.com
+#  ORGANIZATION: GK
+#       CREATED: 05/21/2013 06:18:44 AM HKT
+#      REVISION:  v1
+#===============================================================================
+
+#Max Characters of mssage type
+c_mL=7
+c_Label=msg
+#Color Variable
+c_label="\033[47;1;30m"
+c_err="\033[31m"
+c_blue="\033[34m"
+c_black="\033[30m"
+c_cyan="\033[36m"
+
+#===============================================================================
+echo.label() {
+  printf "${c_label}%s" "$1"; tput sgr0; echo -n " "
+}
+echo.err() {
+  printf "${c_err}%${c_mL}s" "$1"; tput sgr0; echo -n " "
+}
+echo.black() {
+  printf "${c_black}%${c_mL}s" "$1"; tput sgr0; echo -n " "
+}
+echo.blue() {
+  printf "${c_blue}%${c_mL}s" "$1"; tput sgr0; echo -n " "
+}
+#echo.cyan() {
+#  echo -ne "${cyan}$1"; tput sgr0; echo -n " "
+#}
+echo.fix() {
+  echo -n "  "
+  printf "%s\n" "$1"
+}
+
+#===============================================================================
+showMsg() {
+#local MARK=${c_Label^^}
+#local upper=${1^^}
+local MARK=`echo $c_Label | tr '[:lower:]' '[:upper:]'`
+local upper=`echo $1 | tr '[:lower:]' '[:upper:]'`
+case $1 in
+err)
+  echo.label "${MARK}";echo.err "$upper"; echo.fix "$2"
+  exit 1;;
+warn)
+  echo.label "${MARK}";echo.err "$upper"; echo.fix "$2"
+  ;;
+info)
+  echo.label "${MARK}";echo.blue "$upper"; echo.fix "$2"
+  ;;
+debug)
+  echo.label "${MARK}";echo.black "$upper";echo.fix "$2"
+  ;;
+*)
+  echo.label "${MARK}";echo.blue "$upper"; echo.fix "$2"
+esac
+}	# -- levels: err, warn, info, debug, others--
+
+#===============================================================================
+passMsg() {
+  # -- showMsg [err|warn|info|debug|*]
+  local fn=$1
+  local reason=$2
+
+  case $reason in
+  howto)
+  showMsg $reason "./$(basename $0) help|-h"
+  ;;
+  *)
+  ;;
+  esac
+}
+
+#===============================================================================
+#passMsg "$FUNCNAME" howto
+#showMsg warn "pass variable to ..."
+#showMsg debug "pass variable to ..."

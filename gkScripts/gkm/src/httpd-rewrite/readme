@@ -1,0 +1,14 @@
+readme
+
+
+#just for ref
+
+
+architecture:
+
+
+ 8080 recieve request for http://xxx.xxx.com/image/1.png
+
+ rewrite link to http://master.image.xxx.com/image/1.png ro http://slave.iamge.xxx.com/image/1.png
+
+ slave will rewrite link to master if file not found

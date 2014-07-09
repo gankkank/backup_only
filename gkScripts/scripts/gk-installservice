@@ -1,0 +1,93 @@
+```
+#!/bin/bash
+
+#: commands
+#gk2 install ...
+#gk2 install nginx 1.0.1
+#
+
+
+#: install request
+#0. addtional packages
+#1. compile options (configure)
+
+
+#info need: pkg, link, config
+
+#functions
+#include functions:
+echo.info
+echo.err
+echo.blue
+echo.black
+echo.cyan
+echo.fix
+
+#message function: passMsg
+
+#global variables
+```
+
+
+#- MAIN Service -
+
+##install / reinstall request: (no configuration files)
+
+1. install request kind: Full System / Single
+
+1) web server
+
+programming lang: 	php, ruby, nodejs
+web server:		lighttpd, httpd, nginx
+database:		mysql, mongodb, redis
+
+2) single packages
+[service name] [version number] [template name]
+
+2. upgrade request (keep configuration files)
+
+**notice!**: where to keep configration files
+
+
+3. delete / backup
+
+
+##saved template
+
+1. install-time config
+such as template: node, 1.0.0, [template](Basic/Production-Amaze/Production-...)
+apt-get install ...
+./configure --prefix=/opt/node-v1.0.0
+make
+make install
+ln -s /opt/node-v1.0.0 /opt/node
+#modules
+/opt/node/bin/npm install coffee-script -g
+
+##saved bulk install ex
+[node] [latest] [local-dev]
+npm install coffee-script
+npm install coffee2js
+[mongodb] [latest] [apt-get] (apt-get only lastest)
+[nginx] [latest] [local-dev]
+###: may be template first should be better
+./configure --user=www-data --groups=www-data ...
+
+[local-dev]
+
+(nginx)
+#pre installed packages
+pkgs="libpcre3-dev libssl-dev libbz2-dev zlib1g-dev libcurl4-openssl-dev"
+#configure
+modules="--user=www-data --groups=www-data --with-http_ssl_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module --with-http_stub_status_module"
+#default config, please don't change
+link=/opt/nginx
+
+(httpd)
+pkgs=""
+
+[apt-get]
+(mongodb)
+pkgs="mongodb-10gen"
+(mysql)
+pkgs="mysql-server"

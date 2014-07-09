@@ -1,0 +1,156 @@
+#!/bin/bash
+
+#set -eu
+#notice: no -e; because i use grep to return an exit 1 status;
+#notice: no -u; will use if to check $1 or $2 if exsits
+#[depreciate] notice: no exit 1 after err; only pkgConfig needs to be successfull in order to run others.
+#notice \E to \033 to compatible with osx
+err="\033[31m"
+blue="\033[34m"
+echo.err() {
+  echo -ne "${err}$1"; tput sgr0; echo -n " "
+}
+echo.blue() {
+  echo -ne "${blue}$1"; tput sgr0; echo -n " "
+}
+
+passMsg() {
+local status=$1
+[ "x$2" = "x" ] || local service=$2
+case $status in
+err)
+  echo.err "* [err] init ${service} failed. maybe already inited."
+  echo;;
+ok)
+  echo.blue "* [ok] init ${service}."
+  echo;;
+update)
+  echo.blue "* [running...] apt-get update."
+  echo;;
+howto)
+  echo.err "* [howto] $0 [sh|pkg|vim|all|help]"
+  echo;exit 1;;
+noapt)
+  echo.err "* [err] no apt-get"
+  echo;;
+notools)
+  echo.err "* [err] this script need git and curl, please check."
+  echo;;
+help)
+  echo.blue "* [help] command '"$0" vim' can be used in centos,ubuntu and mac osx with git installed";echo
+  echo.blue "* [help] command '"$0" sh' works with centos, ubuntu only as the gk-scripts I wrote support only linux";echo
+  echo.blue "* [help] command '"$0" pkg' will prepare packages needed for gk-scripts";echo
+  exit 1;;
+esac
+}
+#- install packages
+#
+pkgConfig() {
+case $1 in
+apt-get)
+  libpkgs="libssh2-1-dev libssh2-1 build-essential libssl-dev"
+  toolpkgs="vim git-core curl make man-db openssh-server wget"
+#
+  passMsg update
+  apt-get update &> /dev/null
+  apt-get -y install $libpkgs
+  apt-get -y install $toolpkgs
+  passMsg ok packages
+;;
+yum)
+  #yum -y groupinstall "Development tools"
+  #libpkgs=""
+  toolpkgs="vim git make man wget curl"
+  yum -y install $toolpkgs
+;;
+*)
+echo "please make sure you have 'curl', 'git' installed"
+;;
+esac
+}
+pkgLogic() {
+which apt-get &> /dev/null && pkgConfig apt-get
+which yum &> /dev/null && pkgConfig yum
+}
+
+#- prepare scripts
+pkgPrepare() {
+which git &> /dev/null && which curl &> /dev/null && return 0
+which apt-get  &> /dev/null && apt-get install git-core curl
+which yum &> /dev/null && yum install git curl
+which git &> /dev/null || passMsg notools
+which curl &> /dev/null || passMsg notools
+}
+#
+shConfig() {
+pkgPrepare
+#sed -i not compatible with osx
+shRepo="https://github.com/gankkank/docs.git"
+shRoot="/opt/data"
+shLink="/opt/scripts"
+shPath="PATH=\$PATH:/opt/scripts"
+if [ -d $shRoot ] && [ -d ${shRoot}/docs ]
+then
+  passMsg err gk-scripts
+else
+  mkdir -p $shRoot
+  cd $shRoot && git clone $shRepo
+  #modify path
+  grep "^PATH=" ~/.bashrc &> /dev/null
+  if [ $? -eq 1 ]
+  then
+    sed -i "1 i\\$shPath" ~/.bashrc
+  else
+    sed -i "s/^PATH=\$PATH\:\(.*\)/PATH=\$PATH\:\1\:\/opt\/scripts/g" ~/.bashrc
+    echo "here"
+  fi
+  source ~/.bashrc
+  ln -s /opt/data/docs/scripts /opt/scripts
+  passMsg ok gk-scripts
+fi
+}
+
+#- prepare vim
+#
+vimConfig() {
+pkgPrepare
+if [ -d ~/.vim/bundle ] && [ -d ~/.vim/autoload ]
+then
+  passMsg err vim
+else
+  mkdir -p ~/.vim/bundle
+  mkdir -p ~/.vim/autoload
+  #wget http://github.com/tpope/vim-pathogen/raw/master/autoload/pathogen.vim -O ~/.vim/autoload/pathogen.vim
+  curl -L http://github.com/tpope/vim-pathogen/raw/master/autoload/pathogen.vim > ~/.vim/autoload/pathogen.vim #2> /dev/null
+  echo "syntax enable
+call pathogen#infect()
+call pathogen#helptags()
+" > ~/.vimrc
+  cd ~/.vim/bundle
+  git clone git://github.com/kchmck/vim-coffee-script.git
+  git clone git://github.com/tpope/vim-markdown.git
+  git clone git://github.com/vim-ruby/vim-ruby.git
+  git clone git://github.com/pangloss/vim-javascript.git
+  git clone git://github.com/jiangmiao/auto-pairs.git
+  passMsg ok vim
+fi
+}
+
+[ "x$1" = "x" ] && option="" || option=$1
+case $option in
+pkg)
+pkgLogic;;
+sh)
+shConfig;;
+vim)
+vimConfig;;
+all)
+pkgLogic
+shConfig
+vimConfig;;
+help)
+passMsg help
+;;
+*)
+passMsg howto;;
+esac

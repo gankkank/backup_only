@@ -1,0 +1,61 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+#  For test only
+#-------------------------------------------------------------------------------
+baseDir=$(dirname $0)
+msgPath=${baseDir}/msgCenter.v1
+kitPath=${baseDir}/apiKit.v1
+
+source "$msgPath"
+c_mL=5;c_Label=gk3
+source "$kitPath"
+debug=1
+#hostUrl
+
+#-------------------------------------------------------------------------------
+#  rewrite passMsg
+#-------------------------------------------------------------------------------
+
+
+checkLogin
+#reqUrl="${hostUrl}/gkm/request/519ba77ba2ae27e20a000009?field=required"
+#data=`curl -b ~/.gk/gk3.dev.cookie $reqUrl 2> /dev/null`
+#fields="cnfsName|tmplName|version|name"
+#required=`printf "%s" "$data" | egrep "$fields" | sed "s/[,\" ]//g" | sed "s/:/=/g"`
+#num=`printf "%s\n" "$required" | wc -l`
+##echo $num
+##printf "%s\n" "$required"
+#showReq() {
+#for (( i=1; i <= $num; i++ ))
+#do
+#  cnfsName=`printf "%s\n" "$required" | sed -n ${i}p | cut -d= -f2`
+#  let i=i+1
+#  tmplName=`printf "%s\n" "$required" | sed -n ${i}p | cut -d= -f2`
+#  let i=i+1
+#  version=`printf "%s\n" "$required" | sed -n ${i}p | cut -d= -f2`
+#  let i=i+1
+#  name=`printf "%s\n" "$required" | sed -n ${i}p | cut -d= -f2`
+#  echo "gk2 install $name $version $tmplName $cnfsName"
+#done
+#}
+#
+#showReq
+
+case "$1" in
+grouplist)
+getReqList
+#"#jkfdlsfkd" [ubuntu 12.04]
+;;
+groupinfo)
+getReqInfo "$2"
+echo
+;;
+templatelist)
+getTmplList
+;;
+templateinfo)
+getTmplInfo $2 $3
+;;
+*)
+echo
+esac

@@ -1,0 +1,369 @@
+#!/bin/bash
+DEBUG=1
+
+srcPath=/opt/srcv
+dstPath=/opt
+username="www-data"
+
+cecho() {
+echo -en '\E[47;31m'"\033[1m $1 \033[0m \n"; tput sgr0
+}
+errMsg() {
+case $1 in
+err)
+cecho "* [err] already installed"
+;;
+nosrc)
+cecho "* [err] no source in ${srcPath}"
+;;
+steps)
+cecho "* [err] this step has failed"
+;;
+reinstall)
+cecho "* [err] didn't install yet."
+;;
+nosupport)
+cecho "* [err] don't support reinstall yet."
+;;
+*)
+echo "compile install ngx 1.2.7"
+echo "compile reinstall ngx 1.2.7"
+;;
+esac
+exit 1
+}
+finishSteps() {
+for (( i = 0 ; $i < ${#steps[*]} ; i++ ))
+do
+  cecho "* ${steps[$i]}"
+  if [ $DEBUG -eq 1 ]
+  then
+  ${steps[$i]}
+  #not work:
+  [ $? -eq 1 ] && errMsg steps
+  else
+  ${steps[$i]} > /dev/null
+  [ $? -eq 1 ] && errMsg steps
+  fi
+done
+}
+reLink() {
+local linkType=$1
+  cecho "* ln -s ${dstPath}/${linkType} ${link}"
+  [ -L ${link} ] && rm -f ${link}
+  ln -s ${dstPath}/${linkType} ${link}
+  ls -ld ${link}
+}
+basicInstall() {
+#libssl0.9.8 may not need
+#man -> man-db
+apt-get update
+apt-get install -y libssh2-1-dev libssh2-1 build-essential make libssl-dev
+apt-get install -y curl openssh-server man-db
+}
+
+ngxInstall() {
+#./configure;make;make install
+[ -d ${dstPath}/${ngx} ] && errMsg err
+local link=/opt/nginx
+#local thirdMod="--add-module=${srcPath}/ngx_http_auth_pam_module-1.2"
+local modules="--with-http_ssl_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module --with-http_stub_status_module $thirdMod"
+local pkgs="apt-get install -y libpcre3-dev libssl-dev libbz2-dev zlib1g-dev libcurl4-openssl-dev"
+local config="./configure --prefix=${dstPath}/${ngx} --user=${username} --group=${username} ${modules}"
+cd ${srcPath}/${ngx}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make"
+steps[3]="make install"
+finishSteps
+reLink $ngx
+#other
+[ -d ${dstPath}/nginx/conf.d ] || mkdir -p ${dstPath}/nginx/conf.d
+}
+nodeInstall() {
+[ -d ${dstPath}/${node} ] && errMsg err
+local link=/opt/node
+local pkgs="apt-get -y install make build-essential g++ curl libssl-dev apache2-utils"
+local config="./configure --prefix=${dstPath}/${node}"
+cd ${srcPath}/${node}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make"
+steps[3]="make install"
+finishSteps
+reLink $node
+
+#
+which mongod
+if [ $? -eq 1 ]
+then
+/opt/node/bin/npm install -g coffee-script
+apt-key adv --keyserver keyserver.ubuntu.com --recv 7F0CEB10
+echo "deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen" > /etc/apt/sources.list.d/10gen.list
+apt-get update
+apt-get install mongodb-10gen
+fi
+}
+
+#nagios
+nagInstall() {
+[ -d ${dstPath}/${nag} ] && errMsg err
+local link=/opt/nagios
+local modules="--with-command-group=nagcmd --with-nagios-group=nagios"
+local pkgs="apt-get install -y libgd2-xpm libpng12-dev libjpeg-dev libgd2-xpm-dev apache2-utils libapr1 libaprutil1"
+local config="./configure --prefix=${dstPath}/${nag} ${modules}"
+cd ${srcPath}/${nag}
+local preStep="useradd nagios; groupadd nagcmd; usermod -a -G nagcmd nagios; usermod -a -G nagcmd www-data"
+useradd nagios && groupadd nagcmd && usermod -a -G nagcmd nagios; usermod -a -G nagcmd www-data
+cecho "* $preStep"
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make all"
+steps[3]="make install"
+steps[4]="make install-init"
+steps[5]="make install-config"
+steps[6]="make install-exfoliation"
+steps[7]="make install-commandmode"
+finishSteps
+reLink ${nag}
+}
+
+#nagios-plugin
+napInstall() {
+[ -d ${dstPath}/${nap} ] && errMsg err
+local modules="--with-nagios-user=nagios --with-nagios-group=nagios"
+local config="./configure --prefix=${dstPath}/nagios ${modules}"
+cd ${srcPath}/${nap}
+steps[0]=$config
+steps[1]="make"
+steps[2]="make install"
+finishSteps
+}
+
+#nagios nrpe plugin
+nrpInstall() {
+#[ -d ${dstPath}/${nrp} ] && errMsg err
+local pkgs="apt-get install libssl-dev"
+local config="./configure --prefix=${dstPath}/nagios --with-ssl-lib=/usr/lib/x86_64-linux-gnu"
+cd ${srcPath}/${nrp}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make"
+steps[3]="make install"
+finishSteps
+}
+
+#nagios nrpe server
+nrpdInstall() {
+local link=/opt/nrpd
+[ -d ${dstPath}/${nrpd} ] && errMsg err
+local pkgs="apt-get install libssl-dev"
+local modules="--with-ssl-lib=/usr/lib/x86_64-linux-gnu"
+local config="./configure --prefix=${dstPath}/${nrpd} ${modules}"
+cd ${srcPath}/${nrpd}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make"
+steps[3]="make install"
+finishSteps
+reLink ${nrpd}
+#other steps
+cp init-script.debian /etc/init.d/nrpd
+chmod u+x /etc/init.d/nrpd
+[ -d ${dstPath}/${nrpd}/etc ] || mkdir -p ${dstPath}/${nrpd}/etc
+cp sample-config/nrpe.cfg ${dstPath}/${nrpd}/etc
+}
+
+#nagios-pnp4-plugin
+pnpInstall() {
+[ -d ${dstPath}/${pnp} ] && errMsg err
+local link="/opt/pnp4nagios"
+local pkgs="apt-get install -y librrds-perl rrdtool"
+local config="./configure --prefix=${dstPath}/${pnp}"
+cd ${srcPath}/${pnp}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make all"
+steps[3]="make install"
+steps[4]="cp contrib/ssi/status-header.ssi /opt/nagios/share/ssi/"
+finishSteps
+reLink ${pnp}
+#other links
+[ -L /opt/site/pnp4nagios ] || ln -s /opt/pnp4nagios/share /opt/site/pnp4nagios
+}
+
+#php
+phpInstall() {
+[ -d ${dstPath}/${php} ] && errMsg err
+local link=/opt/php
+#curl zip zlib imagemagick
+local pkgs="apt-get install -y libbz2-dev zlib1g-dev libpcre3-dev libssl-dev curl libmysqlclient-dev libmcrypt-dev curl libcurl4-openssl-dev unzip zip imagemagick bison flex libxml2-dev libssl-dev libpng12-dev libmcrypt-dev libpng3 libncurses5-dev"
+local modules="--enable-fpm --with-gd --with-zlib --with-curl --with-iconv --with-openssl --with-mysql --with-pdo-mysql"
+local config="./configure --prefix=${dstPath}/${php} ${modules}"
+cd ${srcPath}/${php}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make"
+steps[3]="make install"
+finishSteps
+reLink ${php}
+#other
+cp sapi/fpm/init.d.php-fpm /etc/init.d/php-fpm
+}
+cgiInstall() {
+[ -d ${dstPath}/${cgi} ] && errMsg err
+local link=/opt/cgi
+local pkgs="apt-get install libfcgi-dev spawn-fcgi git-core build-essential libfcgi-dev autoconf libtool automake"
+local config="./configure --prefix=${dstPath}/${cgi}"
+cd ${srcPath}/${cgi}
+steps[0]=$pkgs
+steps[1]="autoreconf -i"
+steps[2]=$config
+steps[3]="make"
+steps[4]="make install"
+finishSteps
+reLink ${cgi}
+#other links:
+[ -f /usr/sbin/fcgiwrap ] && rm -f /usr/sbin/fcgiwrap
+ln -s /opt/cgi/sbin/fcgiwrap /usr/sbin/fcgiwrap
+}
+
+lightyInstall() {
+[ -d ${dstPath}/${full} ] && errMsg err
+local link=/opt/lighttpd
+local modules="--with-openssl-libs=/usr/lib"
+local config="./configure --prefix=${dstPath}/${full} ${modules}"
+cd ${srcPath}/${full}
+steps[0]=$config
+steps[1]="make"
+steps[2]="make install"
+finishSteps
+reLink ${full}
+}
+
+rubyInstall() {
+local pkgs="apt-get install libreadline-dev libyaml-dev libxslt-dev libxml2-dev libsqlite3-dev"
+$pkgs
+curl https://raw.github.com/wayneeseguin/rvm/master/binscripts/rvm-installer | bash -s stable
+echo -e "install: --no-rdoc --no-ri\nupdate: --no-rdoc --no-ri" > ~/.gemrc
+}
+
+httpdInstall() {
+[ -d ${dstPath}/${full} ] && errMsg err
+local link=/opt/httpd
+local modules="--with-mpm=prefork --enable-so --enable-ssl"
+local config="./configure --prefix=${dstPath}/${full} ${modules}"
+local pkgs="apt-get install libpcre3-dev"
+cd ${srcPath}/${full}
+steps[0]=$pkgs
+steps[1]=$config
+steps[2]="make"
+steps[3]="make install"
+finishSteps
+reLink ${full}
+}
+
+cleanDir() {
+local path=$1
+[ -d ${dstPath}/${path} ] || errMsg reinstall
+local fileID=`date "+%Y%m%d%H%M%S"`
+cecho "* [info] backup org compiled file to ${dstPath}/${path}-${fileID}"
+mv ${dstPath}/${path} ${dstPath}/${path}-${fileID}
+cd ${srcPath}/${path}
+cecho "* make clean" && make clean
+}
+
+installType() {
+#use main variable ${service} ${version}
+case ${service} in
+ngx|nginx)
+ngx="nginx-${version}"
+[ ! -d ${srcPath}/${ngx} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $ngx && ngxInstall
+[ $1 -eq 0 ] && ngxInstall
+;;
+nag|nagios)
+nag="nagios-${version}"
+[ ! -d ${srcPath}/${nag} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $nag && nagInstall
+[ $1 -eq 0 ] && nagInstall
+;;
+nap|nagios-plugin)
+nap="nagios-plugins-${version}"
+[ ! -d ${srcPath}/${nap} ] && errMsg nosrc
+[ $1 -eq 1 ] && errMsg nosupport
+[ $1 -eq 0 ] && napInstall
+;;
+pnp|pnp4nagios)
+pnp="pnp4nagios-${version}"
+[ ! -d ${srcPath}/${pnp} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $pnp && pnpInstall
+[ $1 -eq 0 ] && pnpInstall
+;;
+nrp|nrpe-plugin)
+nrp="nrpe-${version}"
+[ ! -d ${srcPath}/${nrp} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $nrp && nrpInstall
+[ $1 -eq 0 ] && nrpInstall
+;;
+nrpd|nrpe-server)
+nrpd="nrpe-${version}"
+[ ! -d ${srcPath}/${nrpd} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $nrpd && nrpdInstall
+[ $1 -eq 0 ] && nrpdInstall
+;;
+php)
+php="php-${version}"
+[ ! -d ${srcPath}/${php} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $php && phpInstall
+[ $1 -eq 0 ] && phpInstall
+;;
+cgi|fcgiwrap)
+cgi="fcgiwrap"
+[ ! -d ${srcPath}/${cgi} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $cgi && cgiInstall
+[ $1 -eq 0 ] && cgiInstall
+;;
+node|nodejs)
+node="node-v${version}"
+[ ! -d ${srcPath}/${node} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $node && nodeInstall
+[ $1 -eq 0 ] && nodeInstall
+;;
+lighty|lighttpd)
+full="lighttpd-${version}"
+[ ! -d ${srcPath}/${full} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $full && lightyInstall
+[ $1 -eq 0 ] && lightyInstall
+;;
+ruby)
+rubyInstall
+;;
+httpd)
+full="httpd-${version}"
+[ ! -d ${srcPath}/${full} ] && errMsg nosrc
+[ $1 -eq 1 ] && cleanDir $full && httpdInstall
+[ $1 -eq 0 ] && httpdInstall
+;;
+esac
+}
+
+
+#compile install nginx 1.2.7
+#compile reinstall nginx 1.2.7
+#compile status nginx
+nums=$#
+if [ ${nums} -eq 3 ]
+then
+service=$2
+version=$3
+case $1 in
+install)
+installType 0
+;;
+reinstall)
+installType 1
+esac
+else
+basicInstall
+fi

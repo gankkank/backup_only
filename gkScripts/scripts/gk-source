@@ -1,0 +1,73 @@
+#!/bin/bash -e
+#-------------------------------------------------------------------------------
+#  load msg plugin
+#-------------------------------------------------------------------------------
+baseDir=$(dirname $0)
+msgPath=${baseDir}/msgCenter.v1
+source "$msgPath"
+c_mL=5;c_Label=GK-SOURCE
+
+#passMsg() {
+#echo
+#}
+#-------------------------------------------------------------------------------
+#  for source only
+#-------------------------------------------------------------------------------
+#setting: service stable-series release-page download-page
+host_url="https://src-gank.rhcloud.com/source"
+q1=(nginx 1.4 http://nginx.org/en/download.html http://nginx.org/download)
+q2=(httpd 2.4 http://httpd.apache.org/download.cgi http://apache.01link.hk//httpd)
+q3=(node 0.10 http://nodejs.org/download/ http://nodejs.org/dist)
+q4=(php 5.5 http://hk2.php.net/downloads.php http://hk2.php.net/distributions)
+q5=(redis 2.6 http://redis.io/download http://redis.googlecode.com/files)
+
+processData() {
+echo $1 | grep "tar.gz$" &> /dev/null
+[ $? -eq 1 ] && showMsg warn "[$service] skipped; wrong data: $1" && continue
+case $service in
+node)
+v=`echo $1 | sed "s/.tar.gz$//g" | awk -F "-" '{print $2}'`
+url="${src_url}/${v}/${1}"
+version=`echo $v | sed "s/v//g"`
+#echo "$service $version $url"
+;;
+*)
+version=`echo $1 | sed "s/.tar.gz$//g" | awk -F "-" '{print $2}'`
+url="${src_url}/$1"
+;;
+esac
+#echo "$service $version $url"
+showMsg info "post: $service $version $url"
+
+data=`curl "${host_url}/${service}-${version}" 2> /dev/null`
+[ ! "$data" == "" ] && showMsg warn "post: exist" && continue
+curl -X POST -d "service=$service&version=$version&url=$url" $host_url 2> /dev/null | grep "err" && showMsg warn "post: failed" || showMsg info "post: success"
+}
+
+dailyFetch() {
+service=$1
+series=$2
+release_url=$3
+src_url=$4
+
+fetch="${service}-${series}"
+case $service in
+node)
+fetch="${service}-v${series}"
+curlData=`curl $release_url 2> /dev/null |  grep "$fetch" | sed -n "s/.*\(${fetch}.[0-9]*.tar.gz\).*/\1/p" | sort -u`
+;;
+*)
+curlData=`curl $release_url 2> /dev/null |  grep "$fetch" | sed -n "s/.*\(${fetch}.[0-9]*.tar.gz\).*/\1/p" | sort -u`
+;;
+esac
+processData $curlData
+}
+
+
+for (( i=1; i < 6; i++ ))
+do
+  var="q$i"
+  #echo $var
+  data=$(eval echo "\${$var[@]}")
+  dailyFetch ${data[@]} || continue
+done

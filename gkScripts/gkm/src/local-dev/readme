@@ -1,0 +1,24 @@
+#README
+
+1. kind of files
+
+install
+
+readme
+
+${servicename}.*.${type}
+
+
+2. details of filename and content
+
+servicename: [nginx|php|redis|...]
+
+webservices: nginx, lighttpd, httpd
+
+database: redis
+
+lang: nodejs, php
+
+
+
+type: [confs|upstart|init.d]

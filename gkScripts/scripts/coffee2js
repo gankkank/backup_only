@@ -1,0 +1,41 @@
+
+CONF=".coffee2js"
+
+errMsg() {
+case $1 in
+no)
+echo "no such directory"
+;;
+esac
+exit 1
+}
+
+coffee2js() {
+for file in `cat $temp1`
+do
+        echo $file
+        rename=`echo $file | sed "s/coffee$/js/g"`
+        coffee -p $file > $rename
+done
+}
+
+option=$1
+case $option in
+-d)
+  targetPath=$2
+  [ ! -d $targetPath ] && errMsg no
+  temp1=`mktemp -t coffee2js.temp.XXXXXXX`
+  find ${targetPath} -iname "*.coffee" > $temp1
+  coffee2js
+  rm -f $temp1
+;;
+-a)
+  temp1=`mktemp -t coffee2js.temp.XXXXXXX`
+  for targetPath in `cat $CONF`
+  do
+    find ${targetPath} -iname "*.coffee" > $temp1
+    coffee2js
+  done
+  rm -f $temp1
+;;
+esac

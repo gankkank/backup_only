@@ -1,0 +1,47 @@
+#!/bin/bash
+####service package source
+gk3 get source all
+gk3 get source httpd
+gk3 get source httpd 2.4.4 
+#result: [JSON: {name: "", version: "", url: ""}]
+
+gk3 create/post source httpd 2.5.5 http://192.168.1.23/http.2.5.5.tar.gz
+gk3 update/put source httpd 2.5.5 http://httpd.apache.com/download/http.2.5.5.tar.gz
+gk3 remove/delete source httpd 2.5.5
+
+####? not essential?
+gk3 search source [URL: http://httpd.apache.com/download/http.2.5.5.tar.gz]
+
+#- - -
+
+gk3 get gkm/template
+#result: [Fliter: 'name' ]
+
+gk3 get gkm/template local-dev-ubu-12
+#result: [JSON: { name: "local-dev-ubu-12",os="ubuntu-12.04", configs: [ {name: "nginx", config: "pkgs=..."}, {} ] }]
+gk3 get gkm/template local-dev-ubu-12 nginx
+#result: [JSON: {name: "nginx", config: "pkgs=..."}]
+
+#- - -
+
+gk3 get gkm/confgroup
+#result: [Fliter: 'grpname' ]
+
+gk3 get gkm/confgroup default-grp
+#result: [JSON: {grpname: "", grpservices: [ {name: "nginx", main-conf: {filename: "nginx.conf", content: ""}, sub-confs: [ {} ] } , {} ] }]
+gk3 get gkm/confgroup default-grp nginx
+#result: [JSON: {name: "nginx", main-conf: {filename: "nginx.conf", content: ""}, sub-confs: [ {filename: "api-gank.rhcloud.com.conf", content: ""} ] ]
+
+#- - -
+
+gk3 get gkm/usrreq #32438-13-Jan-02
+#result: [JSON: 
+#{ requestBy: "gankgu002", ticket: "#32438-13-Jan-02", targetHost: "api.local.dev.gk.com", os="ubuntu-12.04",
+#  orders: [ {name:"httpd", version: "2.4.4", template: "local-dev", confgrp: "default-grp"}, {} ]  } 
+#]
+
+gk3 get gkm/usrreq #32438-13-Jan-02 orders
+#result: [ JSON:
+#  { name:"httpd", version: "2.4.4", template: "local-dev", confgrp: "default-grp" },
+#  { name:"nginx", version: "1.4.1", template: "local-dev", confgrp: "default-grp" }
+#]

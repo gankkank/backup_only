@@ -1,0 +1,17 @@
+#[[httpd]]
+apt-pkgs="apache2"
+
+#[[mongodb]]
+apt-repo="deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen"
+#sudo apt-key adv --keyserver keyserver.ubuntu.com --recv 7F0CEB10
+#/etc/apt/sources.list.d/10gen.list -> /etc/apt/sources.list.d/mongodb.list
+apt-pkgs="mongodb-10gen"
+
+#[[mysql]]
+apt-pkgs="mysql-server"
+
+#[[inotify]]
+apt-pkgs="inotify-tools"
+
+#[[nrpe-server]]
+apt-pkgs="nagios-nrpe-server"

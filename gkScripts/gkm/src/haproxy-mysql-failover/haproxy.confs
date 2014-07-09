@@ -1,0 +1,27 @@
+#[[mysql.cfg]]
+
+global
+  pidfile /var/run/haproxy.pid
+  user haproxy
+  group haproxy
+  log 127.0.0.1 local1 debug
+  maxconn 50
+
+defaults
+  mode http
+  log global
+
+  stats enable
+  stats uri /haproxy-status
+  stats realm Haproxy
+
+listen http-balance
+  bind 0.0.0.0:8089
+
+listen mysql-failover
+  mode tcp
+  bind 127.0.0.1:3306
+  option tcpka
+  option mysql-check user haproxy
+  server mysql-master 127.0.0.1:3306 fall 10 inter 2s rise 40000 check
+  server mysql-slave1 127.0.0.1:3306 check backup

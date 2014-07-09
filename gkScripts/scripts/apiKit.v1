@@ -1,0 +1,145 @@
+#!/bin/bash - 
+#===============================================================================
+#
+#          FILE: apiKit.sh
+# 
+#         USAGE: ./apiKit.sh 
+# 
+#   DESCRIPTION: 
+# 
+#       OPTIONS: ---
+#  REQUIREMENTS: ---
+#          BUGS: ---
+#         NOTES: ---
+#        AUTHOR: gankkank (), gankkank@gmail.com
+#  ORGANIZATION: GK
+#       CREATED: 05/22/2013 06:24:03 PM HKT
+#      REVISION:  ---
+#===============================================================================
+
+#set -o nounset                              # Treat unset variables as an error
+
+debug=0
+lines=$(tput lines)
+columns=$(tput cols)
+#test showMsg function existence
+
+defineUrl() {
+local fn=$FUNCNAME
+case $HOSTNAME in
+nginx)
+hostUrl="http://192.168.56.203:3000"
+;;
+jimmy-ubun)
+hostUrl="http://192.168.1.63:3000"
+;;
+ubun-c1)
+hostUrl="http://192.168.56.204:3000"
+;;
+ubun-c2)
+hostUrl="http://192.168.1.251:3000"
+;;
+dev1.work.localdomain)
+hostUrl="http://192.168.56.201:3000"
+;;
+*)
+hostUrl="https://api-gank.rhcloud.com"
+;;
+esac
+[ "$debug" == "1" ] && showMsg info "using ${hostUrl} [${fn}]"
+} # -- better test api at non-dev environment? --
+
+checkLogin() {
+local fn=$FUNCNAME
+defineUrl
+local loginUrl="${hostUrl}/signin"
+local okUrl="${hostUrl}/ok"
+
+#gk2 config
+gk2_config=~/.gk/config
+gk3_cookie=~/.gk/gk3.dev.cookie
+gk3_reqCache=~/.gk/gk3.reqList.cache
+gk3_tmplCache=~/.gk/gk3.tmplList.cache
+reqUrl="${hostUrl}/gkm/request"
+tmplUrl="${hostUrl}/gkm/template"
+
+[ "$debug" == "1" ] && showMsg debug "read gk2 config: ${gk2_config}; write: ${gk3_cookie} [$fn]"
+
+local user=`cat $gk2_config | grep user | cut -d = -f 2`
+local pass=`cat $gk2_config | grep pass | cut -d = -f 2`
+curl -X POST -c $gk3_cookie -d "username=${user}&password=${pass}" $loginUrl &> /dev/null
+
+status=`curl -b $gk3_cookie $okUrl 2> /dev/null` 
+[ ! "x$status" == "xok" ] && showMsg warn "can't login $loginUrl [$fn]" && return 1
+[ "$debug" == "1" ] && [ "x$status" == "xok" ] && showMsg info "login $loginUrl succeed [$fn]"
+}
+
+getReqList() {
+local fn=$FUNCNAME
+local cache=$gk3_reqCache
+[ "$debug" == "1" ] && showMsg debug "writing data to $cache [$fn]"
+curl -b $gk3_cookie "${reqUrl}?sh=1" > $cache 2> /dev/null
+[ "$debug" == "1" ] && showMsg debug "read from $cache; field 1, 2 [$fn]"
+#awk -F , '{print $1"\t["$2"]"}' $cache
+#awk -F , '{printf "%-20s [%s]\n", $1, $2}' $cache
+awk -F , '{printf "%-65s [%s] %5s\n", $1, $2, "#"}' $cache
+}
+getReqInfo() {
+local fn=$FUNCNAME
+local cache=$gk3_reqCache
+local ticket=$1
+local id=`grep "$ticket" $cache | awk -F, '{print $3}' || showMsg err "err occured when read cache [$fn]"`
+[ "$debug" == "1" ] && showMsg debug "query ${reqUrl}/${id}?sh=1 [$fn]"
+curl -b $gk3_cookie "${reqUrl}/${id}?sh=1"
+}
+
+getTmplList() {
+local fn=$FUNCNAME
+local cache=$gk3_tmplCache
+[ "$debug" == "1" ] && showMsg debug "writing data to $cache [$fn]"
+curl -b $gk3_cookie "${tmplUrl}?sh=1" > $cache 2> /dev/null; echo >> $cache
+[ "$debug" == "1" ] && showMsg debug "read from $cache; field 1, 2 [$fn]"
+#cmn=$(($columns - 19))
+#awk -v serv=`cut -d, -f4- $cache` -F "," '{printf "%-65s [%s] %5s\n", $1, $2, "#"}' $cache
+#awk -F, '{printf "%-65s [%s] %5s\n", $1, $2, "#"}' $cache
+cat $cache | while read line
+do
+  #echo "- $line"
+  local servs=`echo $line | cut -d, -f4-`
+  local tmpl_name=`echo $line | cut -d, -f1`
+  local tmpl_os=`echo $line | cut -d, -f2`
+  printf "%-25s || %-50s %s %s\n" "$tmpl_name" "$servs" "[$tmpl_os]" "#" 
+done
+
+}
+getTmplInfo() {
+local fn=$FUNCNAME
+local cache=$gk3_tmplCache
+if [ $# -eq 2 ]
+then
+  local name=$1
+  local srv_name=$2
+  #curl -b $gk3_cookie "${tmplUrl}/${name}?sh=1"
+  curl -b $gk3_cookie "${tmplUrl}/${name}?sh=1&name=${srv_name}"
+  echo
+  #echo "${tmplUrl}/${name}?sh=1&name=${srv_name}"
+elif [ $# -eq 1 ]
+then
+  local name=$1
+  tmplCache=~/.gk/tmpl.cache/$name
+  [ -d $tmplCache ] || mkdir $tmplCache
+[ "$debug" == "1" ] && showMsg debug "clean cache in $tmplCache [$fn]"
+  rm -f $tmplCache/*
+  curl -b $gk3_cookie "${tmplUrl}/${name}?sh=1" 2> /dev/null | while read line
+  do
+    echo $line | grep "|$" &> /dev/null
+    if [ $? -eq 0 ]
+    then
+      tmpl_name=`echo $line | sed "s/|//g"`
+    else
+      echo $line >> ${tmplCache}/${tmpl_name}
+    fi
+  done
+  tail ${tmplCache}/*
+fi
+}

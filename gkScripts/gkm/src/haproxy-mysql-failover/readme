@@ -1,0 +1,11 @@
+readme
+
+
+#for ref only
+
+
+#make TARGET=linux2628
+#make PREFIX=/opt/haproxy-1.4.22 install
+#ln -s /opt/haproxy-1.4.22 /opt/haproxy
+
+#add user in mysql haproxy@'localhost'

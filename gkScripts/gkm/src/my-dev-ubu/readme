@@ -1,0 +1,9 @@
+readme
+
+#build mongo for linux
+
+version="r2.4.0"
+git checkout $version
+scons all
+scons --prefix=/opt/mongo-${version} install
+ln -s /opt/mongo-${version} /opt/mongo

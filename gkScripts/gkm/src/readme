@@ -1,0 +1,15 @@
+readme
+
+part 1: install
+
+#apt-pkgs for ubuntu/debain
+#yum-pkgs for centos/rhel
+
+#auto add --prefix=/opt/httpd-${version}
+
+
+
+
+part 3: todo
+
+nagios, nrpe, 

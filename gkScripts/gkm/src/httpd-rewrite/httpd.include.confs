@@ -1,0 +1,49 @@
+#[[conf/extra/httpd-mpm.conf]]
+
+<IfModule !mpm_netware_module>
+    PidFile "logs/httpd.pid"
+</IfModule>
+
+<IfModule !mpm_winnt_module>
+<IfModule !mpm_netware_module>
+LockFile "logs/accept.lock"
+</IfModule>
+</IfModule>
+
+<IfModule mpm_prefork_module>
+    StartServers         10
+    MinSpareServers      10
+    MaxSpareServers      25
+    MaxClients          255
+    MaxRequestsPerChild  1000
+</IfModule>
+
+#[[conf/rewrite-handler.conf]]
+
+<VirtualHost *:8888>
+DocumentRoot /var/www
+ErrorLog /var/log/apache/rewrite_err.log
+TransferLog /var/log/apache/rewrite_access.log
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteMap servers rnd:/opt/apache/conf/map.txt
+RewriteRule ^/(.*) http://${servers:static}/$1
+</IfModule>
+
+</VirtualHost>
+
+<VirtualHost *:8080>
+DocumentRoot /opt/amazead/webapps
+Errorlog /var/log/apache/backupimg_err.log
+TransferLog /var/log/apache/backupimg_access.log
+<Directory "/opt/amazead/webapps">
+  Options FollowSymLinks +Indexes
+  AllowOverride FileInfo
+  Order allow,deny
+  Allow from all
+
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^(.*) http://test.api.amazemobilemedia.com/$1
+</Directory>
+</VirtualHost>

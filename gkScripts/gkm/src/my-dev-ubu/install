@@ -1,0 +1,11 @@
+#[[nginx]]
+apt-pkgs="libpcre3-dev libssl-dev libbz2-dev zlib1g-dev libcurl4-openssl-dev"
+usergrp="www-data"
+option="--user=${usergrp} --groups=${usergrp} --with-http_ssl_module --with-http_stub_status_module"
+
+#[[nodejs]]
+apt-pkgs="libssl-dev apache2-utils"
+
+#[[mongodb]]
+apt-pkgs="git-core build-essential scons"
+yum-pkgs="git-core scons gcc-c++ glibc-devel"

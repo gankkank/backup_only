@@ -1,0 +1,40 @@
+use_cookbooks() {
+[ ! -d /opt/data/ops-cookbooks ]  && cd /opt/data/ && git clone https://github.com/gankkank/ops-cookbooks
+cd /opt/data/ops-cookbooks
+book_path=/opt/data/ops-cookbooks
+
+if [ $# -eq 2 ]
+then
+  book=$1
+  recipe=$2
+  recipe_path=${book}/recipes/${recipe}.sh
+  if [ -f $recipe_path ]
+  then
+    bash $recipe_path
+  else
+    echo "can't find recipe ${book}[${recipe}]"
+  fi
+elif [ $# -eq 1 ]
+then
+  book=$1
+  recipe_path=${book}/recipes/default.sh
+  if [ -f $recipe_path ]
+  then
+    bash $recipe_path
+  else
+    echo "can't find recipe ${book}[${recipe}]"
+  fi
+else
+  echo "usage: gk-ops use langs ruby"
+fi
+}
+
+
+case $1 in
+use)
+  use_cookbooks $2 $3
+;;
+*)
+  echo "usage: gk-ops use langs ruby"
+;;
+esac

@@ -1,0 +1,32 @@
+#[[conf/nginx.conf]]
+worker_processes 11;
+events {
+    worker_connections  1024;
+}
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    keepalive_timeout  65;
+
+    #virtual
+    include local-dev.conf;
+}
+
+#[[conf/local-dev.conf]]
+server {
+  listen 80;
+  server_name local-dev
+  root /opt/site/;
+  index index.html index.php;
+  access_log /var/log/local-dev_access.log;
+  location ~ ^/(.+\.php)$|status {
+    fastcgi_index index.php;
+    fastcgi_pass dev-backends;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    include fastcgi_params;
+  }
+}
+upstream dev-backends {
+  server 127.0.0.1:9000;
+}

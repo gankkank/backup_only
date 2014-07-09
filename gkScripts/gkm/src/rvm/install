@@ -1,0 +1,3 @@
+#[[ruby]]
+
+pkgs="libreadline-dev libyaml-dev libxslt-dev libxml2-dev libsqlite3-dev"

@@ -1,0 +1,5 @@
+#[[httpd]]
+
+apt-pkgs="libpcre3-dev"
+yum-pkgs=""
+options="--with-mpm=prefork --enable-so --enable-ssl --enable-rewrite"

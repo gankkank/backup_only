@@ -1,0 +1,7 @@
+#README
+
+[notice]: use fullpath in confs
+
+database: mysql, mongodb
+
+other-services: nrpe-server, inotify

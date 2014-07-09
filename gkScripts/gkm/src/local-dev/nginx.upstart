@@ -1,0 +1,16 @@
+#[[nginx]]
+# nginx
+description "nginx daemon"
+start on runlevel [2345]
+stop on runlevel [!2345]
+env DAEMON=/opt/nginx/sbin/nginx
+expect fork
+respawn
+respawn limit 10 5
+pre-start script
+        $DAEMON -t -c /opt/nginx/conf/nginx.conf
+        if [ $? -ne 0 ]
+          then exit $?
+        fi
+end script
+exec $DAEMON -c /opt/nginx/conf/nginx.conf

@@ -1,0 +1,119 @@
+
+#logger -i -p local5.warning -t testing "this is the first message warning"
+
+#===============================================================================
+err="\033[31m"
+blue="\033[34m"
+echo.err() {
+  echo -ne "${err}$1"; tput sgr0; echo -n " "
+}
+echo.blue() {
+  echo -ne "${blue}$1"; tput sgr0; echo -n " "
+}
+
+passMsg() {
+case $1 in
+norepo)
+echo.err "* [notice] $repo doesn't exist.";echo
+exit 1;;
+noRepoName)
+echo.err "* [notice] $2 doesn't exist.";echo
+exit 1;;
+nocommit)
+echo.err "* [notice] Nothing to commit or err occured.";echo
+;;
+finish)
+echo.blue "* [info] Finish.";echo
+;;
+ntp)
+echo.err "* [notice] can't update time";echo
+#exit 1
+;;
+howto)
+echo.blue "* [howto] $0 [daily|repo_name msg]";echo
+exit 1;;
+esac
+}
+
+#===============================================================================
+updateTime() {
+ntpdate ntp.ubuntu.com || passMsg ntp
+}
+
+gitConfig() {
+  echo.blue "* [info] Start config git user info.";echo
+  git config --global user.name "$username"
+  git config --global user.email "$email"
+}
+
+preSetting() {
+  #username=`whoami`
+  #email="${username}@${HOSTNAME}"
+  username="gankkank"
+  email="gankkank@gmail.com"
+  git config --list | grep user &> /dev/null || gitConfig
+}
+
+runCommit() {
+  echo.blue "* [info] Checking repo: $repo.";echo
+  echo.blue "* [pull]"
+  cd $repo
+  git pull
+  git add .
+  git commit -m "$msg"
+  [ $? -eq 1 ] && return 1
+  git push
+}
+
+#===============================================================================
+#start:
+
+repos="
+/opt/data/gkScripts
+/opt/data/vimConfig
+/opt/openshift/api
+/opt/data/sample
+/opt/data/repo
+/opt/data/src
+/opt/data/ops-cookbooks
+"
+today=`date +"%Y-%m-%d"`
+localtime=`date +"%H:%M:%S"`
+#echo $msg; exit 1
+
+dailyCommit() {
+  updateTime
+  preSetting
+  for repo in $repos
+  do
+    echo "#==============================================================================="
+    [ -d $repo ] || passMsg norepo
+    runCommit && passMsg finish || passMsg nocommit
+  done
+}
+
+checkCommit() {
+  preSetting
+  printf "%s" "$repos" | while read line
+  do
+    repo=`echo $line | grep "$repoName"`
+    [ $? -eq 0 ] && [ "$(basename $repo)" == "${repoName}" ] && runCommit
+  done
+}
+
+case $1 in
+daily)
+  msg="Daily Commit $today ${localtime} by crontab - ${HOSTNAME}"
+  dailyCommit
+;;
+info)
+  printf "$repos"
+;;
+*)
+  [[ "x" == "x$1" ]] && passMsg howto || repoName=$1
+  [[ "x" == "x$2" ]] && passMsg howto || msg="$2 - ${HOSTNAME}"
+  echo $repos | grep "$1" &> /dev/null || passMsg noRepoName "$1"
+  checkCommit
+;;
+esac
+echo

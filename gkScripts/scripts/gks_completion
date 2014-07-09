@@ -1,0 +1,57 @@
+_gks() {
+
+local cur prev opts
+COMPREPLY=()  
+cur="${COMP_WORDS[COMP_CWORD]}"
+prev="${COMP_WORDS[COMP_CWORD-1]}"
+opts="task gen"
+
+case "${prev}" in
+task)
+  if [ -d "$PWD/tasks" ]
+  then
+    tasks=`ls $PWD/tasks | cut -d. -f1`
+  else
+    tasks=""
+  fi
+  
+  COMPREPLY=($(compgen -W "${tasks}" -- "${cur}"))
+  return 0
+;;
+gen)
+  dirs=`ls -d */ | sed "s:/$::g"`
+  COMPREPLY=($(compgen -W "${dirs}" -- "${cur}"))
+  return 0
+;;
+*)
+;;
+esac
+
+COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
+return 0
+
+}
+
+_gk-repo() {
+local cur prev opts
+COMPREPLY=()
+cur="${COMP_WORDS[COMP_CWORD]}"
+prev="${COMP_WORDS[COMP_CWORD-1]}"
+opts="sync status"
+
+case "${prev}" in
+sync)
+  tasks="update deploy create"
+  COMPREPLY=($(compgen -W "${tasks}" -- "${cur}"))
+  return 0
+;;
+*)
+;;
+esac
+
+COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
+return 0
+}
+
+complete -F _gks gks
+complete -F _gk-repo gk-repo

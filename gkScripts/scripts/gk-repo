@@ -1,0 +1,236 @@
+#!/bin/bash
+#
+#
+#load plugin
+baseDir=$(dirname $0)
+msgPath=${baseDir}/msgCenter.v1
+source "$msgPath"
+c_mL=5;c_Label=gk-repo
+#
+repo_path="/opt/data"
+remote_url="https://repo-gank.rhcloud.com"
+#msg center
+passMsg() {
+case $1 in
+sync_usage)
+showMsg usage "sync [update|deploy|create] [repo_name(optional)]"
+showMsg usage "sync update ops-cookbook"
+showMsg info "update -> github"
+showMsg info "deploy -> openshift"
+showMsg info "create -> ${remote_url}"
+;;
+usage)
+showMsg usage "gk-repo sync [update|deploy|all|create]"
+showMsg usage "gk-repo status"
+;;
+*)
+;;
+esac
+}
+#
+#local config file
+
+
+#functions for show status
+#: status
+check_repotype() {
+name=`basename $repo`
+path=`git config --list | grep "remote.origin.url" | awk -F = '{print $2}'`
+type=""
+echo $path | grep "rhcloud.com" &> /dev/null && type="openshift"
+echo $path | grep "github.com" &> /dev/null && type="github-https"
+echo $path | grep "git@github.com" &> /dev/null && type="github"
+[ "$type" == "" ] && type="unknown"
+}
+repo_local() {
+for repo in `search_repo`
+do
+  cd $repo
+  last_commit=`git log --pretty=oneline | head -n 1 | cut -d " " -f 2-`
+  check_repotype
+  printf "%-16s %-30s %s\n" "[${type}]" "$repo" "$last_commit"
+done
+}
+#
+
+
+
+#helpers
+search_repo() {
+remote_type=$1
+for dir in `ls -d /opt/data/*`
+do
+  config_path="${dir}/.git/config"
+  if [ -f ${config_path} ] && grep "remote" ${config_path} &> /dev/null
+  then
+    cd $dir
+    git config --list | grep "remote.origin.*$remote_type" &> /dev/null 
+    [ $? -eq 0 ] && echo $dir
+  fi
+done
+}
+
+login_host() {
+ip=`netstat -etupn | grep 22 | sed -n 1p | awk '{print $4}' | cut -d : -f 1`
+host="http://${ip}:3000"
+user=`cat ~/.gk/config | grep user | cut -d "=" -f 2`
+pass=`cat ~/.gk/config | grep pass | cut -d "=" -f 2`
+q_user="user=${user}&pass=${pass}"
+cookie="/tmp/session.cookie"
+uri_session="${host}/session"
+uri_user="${host}/user"
+if [ -f "$cookie" ]
+then
+  curl -b $cookie "${uri_user}/${user}" 2> /dev/null #;echo
+else
+  curl -c $cookie -X POST -d "${q_user}" "${uri_session}" 2> /dev/null #;echo
+fi
+}
+
+query_repo() {
+#cache_path=~/.gk/gk-repo.cache
+#[ -d $cache_path ] || mkdir -p $cache_path
+name=${repo_name}
+path=`git config --list | grep "remote.origin.url" | awk -F = '{print $2}'`
+type=""
+echo $path | grep "rhcloud.com" &> /dev/null && type="openshift"
+echo $path | grep "github.com" &> /dev/null && type="github-https"
+echo $path | grep "git@github.com" &> /dev/null && type="github"
+[ "$type" == "" ] && type="unknown" && return
+#last_commit=`git log --pretty=oneline | head -n 1 | cut -d " " -f 2-`
+#total_commit=`git log --pretty=oneline | wc -l`
+case $type in
+openshift)
+url="https://`echo $path | sed -n "s/.*@\(.*\)com.*/\1com/p"`"
+;;
+github)
+url="https://github.com/`echo $path | sed -n "s/.*:\(.*\).git/\1/p"`"
+;;
+*)
+url="unknown"
+;;
+esac
+
+query='{ "name": "'${name}'", "type": "'${type}'", "url": "'${url}'", "path": "'${path}'" }'
+#echo $query
+data=`curl -b $cookie "${host}/repo?name=${name}" 2> /dev/null || echo "error"`
+case $data in
+*no" "data*)
+curl -b $cookie -X POST "$query" "${host}/repo"
+;;
+*error*)
+showMsg warn "[$repo]: fail to connect"
+;;
+*)
+showMsg warn "[$repo]: exsit"
+;;
+esac
+}
+
+update_repo() {
+today=`date +"%Y-%m-%d"`
+repo_name=`basename $repo`
+if [ "$1" == "" ]
+then
+  cd $repo
+elif [ "$1" == "$repo_name" ]
+then
+  cd $repo
+else
+  return
+fi
+check_repotype
+showMsg info "[$type][$repo]: start sync (pull and push)"
+git pull
+
+if [ "$type" == "github-https" ]
+then
+  showMsg warn "[$type][$repo]: if you want to commit, please use ssh."
+else
+  git add .
+  git commit -m "daily update ${today} - ${HOSTNAME}"
+  [ $? -eq 0 ] && git push 
+fi
+showMsg info "[$type][$repo]: finish sync"
+echo
+}
+
+create_repo() {
+repo_name=`basename $repo`
+if [ "$1" == "" ]
+then
+  cd $repo
+elif [ "$1" == "$repo_name" ]
+then
+  cd $repo
+else
+  return
+fi
+showMsg info "[$repo]: start create (push) $repo"
+query_repo
+showMsg info "[$repo]: finish create $repo"
+echo
+}
+#
+repo_sync() {
+#gk-repo sync update
+echo -e "$0\t option: $1"
+echo -e "-------------------------------------\n"
+case $1 in
+update)
+for repo in `search_repo github`
+do
+  update_repo $2
+done
+;;
+deploy)
+for repo in `search_repo rhcloud`
+do
+  update_repo $2
+done
+;;
+all)
+for repo in `search_repo`
+do
+  update_repo
+done
+;;
+create)
+login_host
+for repo in `search_repo`
+do
+  create_repo $2
+done
+;;
+*)
+passMsg sync_usage
+;;
+esac
+}
+
+
+
+
+
+#main logic
+command=$1
+shift
+opt=$@
+case $command in
+sync)
+repo_sync $opt
+;;
+local)
+repo_local $opt
+;;
+remote)
+repo_local $opt
+;;
+status)
+repo_local $opt | sort
+;;
+*)
+passMsg usage
+;;
+esac
+#echo $opt

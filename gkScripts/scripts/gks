@@ -1,0 +1,165 @@
+#!/bin/bash
+
+#
+check_task() {
+task=$1
+command=$2
+if [ -f "tasks/$task" ]
+then
+  taskPath=tasks/$task
+elif [ -f "tasks/${task}.sh" ]
+then
+  taskPath=tasks/${task}.sh
+else
+  echo "err: no task is found"
+  exit 1
+fi
+bash $taskPath $command
+}
+
+#=======================================================================================
+check_express() {
+which express &> /dev/null || exit 1
+}
+
+gen_template() {
+
+check_express
+
+projname=$1
+express $projname
+cd $projname
+
+mkdir {lib,v1,configs}
+mkdir -p {v1/controllers,v1/models}
+current=$PWD
+
+cat > app.coffee <<EOF
+express = require "express"
+http = require "http"
+path = require "path"
+app = express()
+
+MongooseStore = require("./lib/express-mongodb")(express)
+db = require("./configs/database").conn1
+options = {
+  connection: db
+  collection: "mysessions"
+  clear_interval: 3600
+}
+sessionStore = new MongooseStore(options)
+
+port = process.env.OPENSHIFT_INTERNAL_PORT or process.env.PORT or 3000
+addr = process.env.OPENSHIFT_INTERNAL_IP or process.env.IP or "0.0.0.0"
+
+_24Hours = 24 * 60 * 60 * 1000
+_1Month = 30 * 24 * 60 * 60 * 1000
+
+db.on "error", (err) ->
+  console.log "err occurred: #{err}"
+
+app.configure ->
+  app.set 'port', process.env.PORT || 3000
+  app.set 'views', __dirname + 'views'
+  app.set 'view engine', 'jade'
+  app.use express.favicon()
+  app.use express.logger('dev')
+  app.use express.bodyParser()
+  app.use express.methodOverride()
+  app.use express.cookieParser()
+  app.use express.session(
+    cookie: { maxAge: _24Hours * 5 }
+    secret: "my secret"
+    store: sessionStore
+  )
+  app.use app.router
+  app.use express.static("#{__dirname}/public", { maxAge: _1Month })
+
+app.configure "development", ->
+  app.use express.errorHandler()
+
+auth = (req, res, next) ->
+  if req.session.username?
+    next()
+  else
+    #console.log req.sessionID
+    res.redirect "/signin"
+
+resource = require("./lib/resource")(app, db)
+resource "v1", "home"
+
+app.get "/", (req, res) -> res.send "ok"
+app.get "/signin", (req, res) -> res.send "not authorized"
+
+http.createServer(app).listen app.get("port"), ->
+  console.log "Express Listening on port #{app.get 'port'}"
+EOF
+
+cat > package.json <<EOF
+{
+  "name": "application-name",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "3.2.6",
+    "jade": "*",
+    "mongoose": "*",
+    "coffee-script": "*",
+    "underscore": "*"
+  }
+}
+EOF
+
+#create libraries and sample controller and configs
+cd lib
+curl -L https://github.com/gankkank/express/raw/master/lib/express-mongodb.js 2> /dev/null > express-mongodb.js
+curl -L https://github.com/gankkank/express/raw/master/lib/resource.coffee 2> /dev/null > resource.coffee
+cd $current
+cat > v1/controllers/home.coffee <<EOF
+module.exports = (db) ->
+  home = ->
+  home::index = (req, res) -> 
+    res.send "welcome to home"
+  new home
+EOF
+cat > configs/database.coffee <<EOF
+mongoose = require "mongoose"
+host = process.env.OPENSHIFT_MONGODB_DB_HOST or "localhost"
+uri = "mongodb://#{host}/api" if host is "localhost"
+#uri = ..
+conn1 = mongoose.createConnection uri
+exports.conn1 = conn1
+EOF
+
+#sample tasks
+cd $current
+mkdir tasks
+cat > tasks/server.sh <<EOF
+#filePath="\$PWD/\$0"
+#[ -f "\$filePath" ] || echo "load err, please use it in project root"
+coffee -o js/ -c coffee/
+coffee app.coffee
+EOF
+cat > tasks/test.sh <<EOF
+echo $0
+EOF
+
+#npm install
+}
+#=======================================================================================
+
+case $1 in
+task)
+check_task $2 $3
+#echo $taskPath
+;;
+gen)
+[ "x" == "x$2" ] && echo "err: need project name" && exit 1
+gen_template $2
+;;
+*)
+echo "howto: gk [gen|task] name"
+esac
